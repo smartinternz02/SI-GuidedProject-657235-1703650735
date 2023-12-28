@@ -1,0 +1,300 @@
+pip install tensorflow==2.8.0
+import os
+from glob import glob
+from matplotlib import pyplot
+import matplotlib.pyplot as plt
+import tensorflow as tf
+import random
+import cv2
+import pandas as pd
+import numpy as np
+import matplotlib.gridspec as gridspec
+import seaborn as sns
+import itertools
+import sklearn
+import itertools
+import scipy
+import skimage
+from skimage.transform import resize
+import csv
+from tqdm import tqdm
+from sklearn import model_selection
+from sklearn.model_selection import train_test_split, learning_curve,KFold,cross_val_score,StratifiedKFold
+from sklearn.metrics import confusion_matrix
+import keras
+from keras.utils import np_utils
+from keras.utils.np_utils import to_categorical
+#from tensorflow.keras.utils import load_img, img_to_array
+from keras.preprocessing.image import load_img,img_to_array
+from keras import models, layers, optimizers
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, accuracy_score
+
+
+from keras.preprocessing.image import ImageDataGenerator
+
+from keras.applications.vgg16 import VGG16
+from keras.models import Model
+
+%matplotlib inline
+
+import warnings
+warnings.filterwarnings("ignore")
+
+
+
+import keras
+from keras.preprocessing.image import load_img,img_to_array
+
+
+
+''' Data Path '''
+train_path = '/content/drive/MyDrive/jayaram /Healthy'
+
+File=[]
+for f in os.listdir(train_path):
+    File += [f]
+
+'''  total number of classes '''
+print(File)
+import os
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+
+train_data = []
+
+# Define the main directory containing class subdirectories
+main_directory = '/content/drive/MyDrive/jayaram '
+
+# Define the mapping from class names to labels
+mapping = {'defect': 0, 'Healthy': 1}
+
+# Loop through class subdirectories
+for class_name, label in mapping.items():
+    class_directory = os.path.join(main_directory, class_name)
+
+    # Loop through image files in the class directory
+    for im in os.listdir(class_directory):
+        if im.endswith(".jpg"):  # Ensure you're only processing image files
+            img = load_img(os.path.join(class_directory, im), grayscale=False, color_mode='rgb', target_size=(150, 150))
+            img = img_to_array(img)
+            img = img / 255.0
+            train_data.append([img, label])
+
+# Now, train_data should contain image data and corresponding labels.
+train_images, train_labels = zip(*train_data)
+
+
+# prompt: code to implement image processing using tensor flow and find accuracy and plot them healthy and defect with drive input
+
+from tensorflow import keras
+from keras.preprocessing.image import ImageDataGenerator
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D
+from keras.callbacks import ModelCheckpoint, EarlyStopping
+from keras.optimizers import Adam
+from keras.utils import to_categorical
+
+# Create the data generator
+train_datagen = ImageDataGenerator(rescale=1./255, validation_split=0.2)
+
+# Create the training and validation sets
+train_generator = train_datagen.flow_from_directory(
+    '/content/drive/MyDrive/jayaram/Healthy',
+    target_size=(150, 150),
+    batch_size=32,
+    class_mode='binary',
+    subset='training')
+
+validation_generator = train_datagen.flow_from_directory(
+    '/content/drive/MyDrive/jayaram/defect',
+    target_size=(150, 150),
+    batch_size=32,
+    class_mode='binary',
+    subset='validation')
+
+# Define the model architecture
+model = Sequential([
+    Conv2D(32, (3, 3), activation='relu', input_shape=(150, 150, 3)),
+    MaxPooling2D((2, 2)),
+    Conv2D(64, (3, 3), activation='relu'),
+    MaxPooling2D((2, 2)),
+    Conv2D(128, (3, 3), activation='relu'),
+    MaxPooling2D((2, 2)),
+    Flatten(),
+    Dense(128, activation='relu'),
+    Dropout(0.5),
+    Dense(1, activation='sigmoid')
+])
+
+# Compile the model
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+# Train the model
+model.fit(train_generator, epochs=50, validation_data=validation_generator)
+
+# Evaluate the model
+model.evaluate(validation_generator)
+
+# Save the model
+model.save('model.h5')
+''' converting labels into to_categorical '''
+train_labels = to_categorical(train_labels)
+
+''' coverting train_images into numpy array '''
+train_images = np.array(train_images)
+
+''' converting train_labesl into numpy array '''
+train_labels = np.array(train_labels)
+
+''' shaep of train_images and train_labels '''
+print(train_images.shape)
+print(train_labels.shape)
+''' reshaping images '''
+train_images = train_images.reshape(-1,150,150,3)
+''' train test split '''
+X_train, X_test, y_train, y_test = train_test_split(train_images,train_labels, test_size=0.2,random_state=44)
+''' shape of X_train, X_test, y_train, y_test '''
+print(X_train.shape)
+print(X_test.shape)
+print(y_train.shape)
+print(y_test.shape)
+''' data Augmentation '''
+data_aug = ImageDataGenerator(horizontal_flip=True, vertical_flip=True, rotation_range=20, zoom_range=0.2,
+                    width_shift_range=0.2, height_shift_range=0.2, shear_range=0.1, fill_mode="nearest")
+from tensorflow.keras.applications.vgg16 import VGG16
+model1 = VGG16(input_shape=(150,150,3),include_top=False,weights='imagenet',pooling='avg')
+
+''' freezing layers '''
+model1.trainable = False
+inp = model1.input
+''' Hidden Layer '''
+x = tf.keras.layers.Dense(128, activation='relu')(model1.output)
+''' Classification Layer '''
+out = tf.keras.layers.Dense(2, activation='sigmoid')(x)
+
+''' Model '''
+model_VGG16 = tf.keras.Model(inputs=inp, outputs=out)
+
+''' compile the model '''
+model_VGG16.compile(loss = 'categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+''' training '''
+history_VGG16 = model_VGG16.fit(data_aug.flow(X_train, y_train, batch_size=32), validation_data=(X_test, y_test), epochs=100)
+# Viewing Model Summary
+print(model_VGG16.summary())
+##### Checking and extracting the indexes of "Convolutional Layers"
+t=list(model_VGG16.layers)
+
+
+
+conv_index=[]
+for i in range(len(t)):
+  layer=t[i]
+  if 'conv' in layer.name:
+    conv_index.append(i)
+
+print("Indexes of Convolutional Layers are ",conv_index)
+##### Checking layer name and output shapes
+for i in conv_index:
+  layer=model_VGG16.layers[i]
+  print("layer name is :{}            output Shape is : {}".format(layer.name,layer.output.shape))
+  ##### Checking layer name and output shapes
+for i in conv_index:
+  layer=model_VGG16.layers[i]
+  print("layer name is :{}            output Shape is : {}".format(layer.name,layer.output.shape))
+  ###### For Demo Visualizing 1st convolutional layer output
+M_conv_1=Model(inputs=model_VGG16.inputs, outputs=model_VGG16.layers[1].output)
+M_conv_1.summary()
+###### Loading Sample Image for the above layer
+''' loading an image '''
+img = load_img("/content/drive/MyDrive/CORE  PROJECT/Healthy/20211231_123552 (Custom).jpg",target_size=(150,150))
+
+''' converting img to array '''
+img = img_to_array(img)
+
+''' scaling '''
+img = img / 255.0
+
+''' expanding dimensions '''
+img = np.expand_dims(img, axis=0)
+
+feature_maps=M_conv_1.predict(img)
+
+
+from matplotlib import pyplot
+square=8
+ix=1
+ax=pyplot.figure(figsize=(8,8))
+for i in range(square):
+  for j in range(square):
+    ax=pyplot.subplot(square,square,ix)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_aspect('equal')
+
+    pyplot.imshow(feature_maps[0,:,:,ix-1],aspect='auto',cmap="viridis")
+    ix+=1
+
+
+plt.savefig("CO1.tiff", format='tiff')
+pyplot.show()
+from matplotlib import pyplot
+square=8  #There are 512 Images at output of conv_4, so let plot 23*22=506 Images
+ix=1
+ax=pyplot.figure(figsize=(8,8))
+for i in range(square):
+  for j in range(square-1):
+    ax=pyplot.subplot(square,square,ix)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_aspect('equal')
+
+    pyplot.imshow(feature_maps[0,:,:,ix-1],aspect='auto',cmap="viridis")
+    ix+=1
+
+
+plt.savefig("CO4.tiff", format='tiff')
+pyplot.show()
+from matplotlib import pyplot
+square=8 #There are 512 Images at output of conv_5, so let plot 23*22=506 Images
+ix=1
+ax=pyplot.figure(figsize=(8,8))
+for i in range(square):
+  for j in range(square-1):
+    ax=pyplot.subplot(square,square,ix)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_aspect('equal')
+
+    pyplot.imshow(feature_maps[0,:,:,ix-1],aspect='auto',cmap="viridis")
+    ix+=1
+
+plt.savefig("CO5.tiff", format='tiff')
+#pyplot.savefig("CO5.tiff",dim=500)
+pyplot.show()
+''' prediction '''
+y_pred= model_VGG16.predict(X_test)
+
+''' retreiving max val from predicted values '''
+pred = np.argmax(y_pred,axis=1)
+
+''' retreiving max val from actual values '''
+ground = np.argmax(y_test,axis=1)
+from sklearn.metrics import classification_report
+''' classificaion report '''
+print(classification_report(ground,pred))
+''' training loss and validation loss graph '''
+epochs = range(100)
+plt.plot(epochs, history_VGG16.history['loss'], 'r', label='Loss of Training data', linewidth=2)
+plt.plot(epochs, history_VGG16.history['val_loss'], 'b', label='Loss of Validation data', linewidth=2)
+plt.title('Training vs validation loss')
+plt.legend(loc=0)
+plt.figure()
+plt.show()
+''' training accuracy and validation accuracy graph '''
+epochs = range(100)
+plt.plot(epochs, history_VGG16.history['accuracy'], 'r', label='Accuracy of Training data', linewidth=2)
+plt.plot(epochs, history_VGG16.history['val_accuracy'], 'b', label='Accuracy of Validation data', linewidth=2)
+plt.title('Training vs validation accuracy')
+plt.legend(loc=0)
+plt.figure()
+plt.show()
